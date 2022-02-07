@@ -10,6 +10,7 @@ const {
   cliTransform,
 } = require('./helpers');
 const { getGrpcCredentials } = require('../tls');
+const { v4: uuidv4 } = require('uuid');
 
 function TemporalClient(tlsConfig) {
   const dir = process.cwd();
@@ -270,6 +271,23 @@ TemporalClient.prototype.signalWorkflow = async function(
   };
 
   const res = await this.client.signalWorkflowExecutionAsync(ctx, req);
+
+  return uiTransform(res);
+};
+
+TemporalClient.prototype.resetWorkflow = async function(
+  ctx,
+  { namespace, execution, eventID, reason }
+) {
+  const req = {
+    namespace,
+    workflowExecution: buildWorkflowExecutionRequest(execution),
+    reason,
+    workflowTaskFinishEventId: eventID,
+    requestId: uuidv4(),
+  };
+
+  const res = await this.client.resetWorkflowExecutionAsync(ctx, req);
 
   return uiTransform(res);
 };

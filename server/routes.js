@@ -230,6 +230,20 @@ router.post(
   }
 );
 
+router.post(
+  '/api/namespaces/:namespace/workflows/:workflowId/:runId/reset',
+  async function(ctx) {
+    const { namespace, workflowId, runID } = ctx.params;
+
+    ctx.body = await tClient().resetWorkflow(ctx, {
+      namespace,
+      execution: { workflowId, runID },
+      eventID: ctx.request.body.eventID,
+      reason: ctx.request.body.reason,
+    });
+  }
+);
+
 router.get(
   '/api/namespaces/:namespace/workflows/:workflowId/:runId',
   async function(ctx) {

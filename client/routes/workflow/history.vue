@@ -36,17 +36,57 @@
         </div>
       </div>
       <div class="actions">
-        <a href="#" @click.prevent="toggleShowGraph()"
-          >{{ showGraph ? 'hide' : 'show' }} graph</a
-        >
+        <a href="#" @click.prevent="toggleShowGraph()">
+          {{ showGraph ? 'hide' : 'show' }} graph
+        </a>
         <a
           class="export"
           :href="baseAPIURL + '/export'"
           :download="exportFilename"
-          >Export</a
         >
+          Export
+        </a>
+        <a
+          href=""
+          class="reset"
+          @click.prevent="$modal.show('reset-workflow')"
+          data-cy="open-reset-dialog"
+        >
+          Reset
+        </a>
       </div>
     </header>
+
+    <modal name="reset-workflow">
+      <h3>Are you sure you want to reset this workflow?</h3>
+      <input
+        v-model.number="resetEventID"
+        placeholder="Event ID"
+        data-cy="reset-event-id"
+      />
+      <input
+        v-model="resetReason"
+        placeholder="Reason"
+        data-cy="reset-reason"
+      />
+      <footer>
+        <a
+          href="#"
+          class="reset"
+          @click.prevent="resetWorkflow"
+          data-cy="confirm-reset"
+        >
+          Reset
+        </a>
+        <a
+          href="#"
+          class="cancel"
+          @click.prevent="$modal.hide('reset-workflow')"
+        >
+          Cancel
+        </a>
+      </footer>
+    </modal>
 
     <Split
       class="split-panel"
@@ -275,6 +315,9 @@ import omit from 'lodash-es/omit';
 import Timeline from './components/timeline.vue';
 import EventDetail from './components/event-detail.vue';
 import { DetailList } from '~components';
+import { RESET_DEFAULT_ERROR_MESSAGE } from './constants';
+import { NOTIFICATION_TYPE_ERROR, NOTIFICATION_TYPE_SUCCESS } from '~constants';
+import { getErrorMessage } from '~helpers';
 
 export default {
   name: 'history',
@@ -301,6 +344,8 @@ export default {
       splitSizeSet: [1, 99],
       splitSizeMinSet: [0, 0],
       unwatch: [],
+      resetEventID: undefined,
+      resetReason: undefined,
     };
   },
   props: [
@@ -526,6 +571,30 @@ export default {
       }
 
       this.$emit('onEventsScroll', startIndex, endIndex);
+    },
+    resetWorkflow() {
+      this.$modal.hide('reset-workflow');
+      this.$http
+        .post(`${this.baseAPIURL}/reset`, {
+          eventID: this.resetEventID,
+          reason: this.resetReason,
+        })
+        .then(
+          r => {
+            this.$emit('onNotification', {
+              message: 'Workflow reset.',
+              type: NOTIFICATION_TYPE_SUCCESS,
+            });
+            // eslint-disable-next-line no-console
+            console.dir(r);
+          },
+          error => {
+            this.$emit('onNotification', {
+              message: getErrorMessage(error, RESET_DEFAULT_ERROR_MESSAGE),
+              type: NOTIFICATION_TYPE_ERROR,
+            });
+          }
+        );
     },
   },
   watch: {
@@ -802,4 +871,16 @@ section.history
           padding 4px
       a.close
         top layout-spacing-small
+
+[data-modal="reset-workflow"]
+  input
+    margin layout-spacing-small 0
+    width 50vw
+  footer
+    display flex
+    justify-content space-between
+  a.reset
+    action-button(uber-orange)
+  a.cancel
+    action-button()
 </style>
