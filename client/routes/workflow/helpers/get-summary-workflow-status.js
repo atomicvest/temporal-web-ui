@@ -4,6 +4,9 @@ const getSummaryWorkflowStatus = ({
   workflowCompletedEvent,
 }) => {
   if (isWorkflowRunning) {
+    if ((workflow?.workflowExecutionInfo?.searchAttributes?.WaitingForSignal ?? '') != '') {
+      return `waiting for signal (${workflow.workflowExecutionInfo.searchAttributes.WaitingForSignal})`
+    }
     return 'running';
   }
 

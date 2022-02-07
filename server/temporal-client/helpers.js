@@ -153,7 +153,11 @@ function uiTransform(item, rawPayloads = false, transformingPayloads = false) {
 
           Object.entries(subvalue.indexedFields).forEach(
             ([subkey, subvalue]) => {
-              values[subkey] = subvalue.data.toString('utf8');
+              try {
+                values[subkey] = JSON.parse(subvalue.data.toString('utf8'));
+              } catch(e) {
+                values[subkey] = subvalue.data.toString('utf8');
+              }
             }
           );
           item[subkey] = values;

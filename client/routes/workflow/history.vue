@@ -664,6 +664,7 @@ section.history
           margin-left: 10px;
           display: inline-block;
           width: 150px;
+          vertical-align: top;
       & + .spacer
         width: 100%;
         height: 58px;

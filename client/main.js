@@ -7,9 +7,11 @@ import vueSplit from 'vue-split-panel';
 import qs from 'friendly-querystring';
 import moment from 'moment';
 import promiseFinally from 'promise.prototype.finally';
+import PrettyInput from 'pretty-checkbox-vue/input';
+import PrettyCheck from 'pretty-checkbox-vue/check';
+import PrettyRadio from 'pretty-checkbox-vue/radio';
 
 import copyButton from './components/copy';
-
 import snapscroll from './directives/snapscroll';
 
 import App from './App';
@@ -270,6 +272,9 @@ Vue.use(vueModal, {
 Vue.use(vueSplit);
 Vue.component('v-select', vueSelect);
 Vue.component('copy', copyButton);
+Vue.component('p-input', PrettyInput);
+Vue.component('p-check', PrettyCheck);
+Vue.component('p-radio', PrettyRadio);
 Vue.directive('snapscroll', snapscroll);
 Vue.config.ignoredElements = ['loader'];
 

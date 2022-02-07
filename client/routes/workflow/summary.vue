@@ -1,6 +1,18 @@
 <template>
   <section class="workflow-summary" data-cy="summary">
     <aside class="actions">
+      <feature-flag name="workflow-signal">
+        <a
+          href=""
+          class="signal"
+          v-show="showSignal"
+          @click.prevent="$modal.show('send-signal')"
+          data-cy="open-signal-dialog"
+        >
+          Signal
+        </a>
+      </feature-flag>
+
       <feature-flag name="workflow-terminate">
         <a
           href=""
@@ -13,6 +25,42 @@
         </a>
       </feature-flag>
     </aside>
+
+    <modal name="send-signal">
+      <h3>Are you sure you want to signal this workflow?</h3>
+      <div class="checkbox">
+        <p-check name="success" color="primary" v-model="signalSuccess">
+          Success
+        </p-check>
+      </div>
+      <input
+        v-model="signalStatus"
+        placeholder="Status"
+        data-cy="signal-status"
+      />
+      <input
+        v-model="signalMetadata"
+        placeholder="Metadata"
+        data-cy="signal-metadata"
+      />
+      <footer>
+        <a
+          href="#"
+          class="send-signal"
+          @click.prevent="sendSignal"
+          data-cy="send-signal"
+        >
+          Send
+        </a>
+        <a
+          href="#"
+          class="cancel"
+          @click.prevent="$modal.hide('send-signal')"
+        >
+          Cancel
+        </a>
+      </footer>
+    </modal>
 
     <modal name="confirm-termination">
       <h3>Are you sure you want to terminate this workflow?</h3>
@@ -157,7 +205,7 @@
 </template>
 
 <script>
-import { TERMINATE_DEFAULT_ERROR_MESSAGE } from './constants';
+import { TERMINATE_DEFAULT_ERROR_MESSAGE, SIGNAL_DEFAULT_ERROR_MESSAGE } from './constants';
 import { NOTIFICATION_TYPE_ERROR, NOTIFICATION_TYPE_SUCCESS } from '~constants';
 import { getErrorMessage } from '~helpers';
 import { BarLoader, DataViewer, DetailList, FeatureFlag } from '~components';
@@ -165,6 +213,9 @@ import { BarLoader, DataViewer, DetailList, FeatureFlag } from '~components';
 export default {
   data() {
     return {
+      signalSuccess: false,
+      signalStatus: undefined,
+      signalMetadata: undefined,
       terminationReason: undefined,
       webSettingsCache: undefined,
     };
@@ -209,8 +260,41 @@ export default {
     showTerminate() {
       return this.isWorkflowRunning && this.webSettingsCache?.permitWriteApi;
     },
+    showSignal() {
+      return this.isWorkflowRunning &&
+        this.webSettingsCache?.permitWriteApi &&
+        (this.workflow?.workflowExecutionInfo?.searchAttributes?.WaitingForSignal ?? '') != ''
+    }
   },
   methods: {
+    sendSignal() {
+      this.$modal.hide('send-signal');
+      this.$http
+        .post(`${this.baseAPIURL}/signal`, {
+          signalName: this.workflow.workflowExecutionInfo.searchAttributes.WaitingForSignal,
+          payload: {
+            success: this.signalSuccess,
+            status: this.signalStatus,
+            metadata: this.signalMetadata,
+          }
+        })
+        .then(
+          r => {
+            this.$emit('onNotification', {
+              message: 'Workflow signalled.',
+              type: NOTIFICATION_TYPE_SUCCESS,
+            });
+            // eslint-disable-next-line no-console
+            console.dir(r);
+          },
+          error => {
+            this.$emit('onNotification', {
+              message: getErrorMessage(error, SIGNAL_DEFAULT_ERROR_MESSAGE),
+              type: NOTIFICATION_TYPE_ERROR,
+            });
+          }
+        );
+    },
     terminate() {
       this.$modal.hide('confirm-termination');
       this.$http
@@ -283,7 +367,7 @@ section.workflow-summary
       font-family monospace-font-family
   .workflow-status
     dd
-      text-transform capitalize
+      text-transform none
       a
         text-transform none
     &[data-status="completed"] dd
@@ -295,17 +379,37 @@ section.workflow-summary
 
   aside.actions
     float right
-    a
+    display flex
+    flex-direction row
+    a.terminate
       action-button(uber-orange)
+    a.signal
+      action-button(uber-blue)
+      margin-right 5px
 
 [data-modal="confirm-termination"]
   input
-    margin layout-spacing-medium 0
+    margin layout-spacing-small 0
+    width 50vw
   footer
     display flex
     justify-content space-between
   a.terminate
     action-button(uber-orange)
+  a.cancel
+    action-button()
+
+[data-modal="send-signal"]
+  div.checkbox
+    margin layout-spacing-small 0
+  input
+    margin layout-spacing-small 0
+    width 50vw
+  footer
+    display flex
+    justify-content space-between
+  a.send-signal
+    action-button(uber-green)
   a.cancel
     action-button()
 </style>

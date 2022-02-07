@@ -5,6 +5,7 @@
       <div class="col col-link">Run Id</div>
       <div class="col col-name">Name</div>
       <div class="col col-status">Status</div>
+      <div class="col col-waiting">Waiting for Signal</div>
       <div class="col col-start">Start Time</div>
       <div class="col col-end">End Time</div>
     </div>
@@ -35,8 +36,8 @@
           </router-link>
         </div>
         <div class="col col-name">{{ item.workflowName }}</div>
-
         <div class="col col-status" :class="item.status">{{ item.status }}</div>
+        <div class="col col-waiting">{{ signalName(item) }}</div>
         <div class="col col-start">{{ item.startTime }}</div>
         <div class="col col-end">{{ item.endTime }}</div>
       </div>
@@ -57,6 +58,12 @@ export default {
     };
   },
   methods: {
+    signalName(workflow) {
+      if (workflow.status === 'running') {
+        return workflow.searchAttributes?.WaitingForSignal ?? ''
+      }
+      return ''
+    },
     onScroll(startIndex, endIndex) {
       if (!this.workflows || endIndex < this.workflows.length) {
         return;
@@ -81,6 +88,9 @@ export default {
 @require "../styles/definitions.styl"
 
 paged-grid()
+
+.vue-recycle-scroller
+  overflow-y: scroll !important
 
 .workflow-grid
   height: calc(100vh - 203px)
@@ -139,6 +149,8 @@ paged-grid()
         color uber-orange
       &.running
         color uber-blue-120
+    &.col-waiting
+      flex-basis: 400px;
     &.col-start
       flex-basis: 200px;
     &.col-end

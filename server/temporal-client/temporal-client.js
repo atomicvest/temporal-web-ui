@@ -253,12 +253,20 @@ TemporalClient.prototype.terminateWorkflow = async function(
 
 TemporalClient.prototype.signalWorkflow = async function(
   ctx,
-  { namespace, execution, signal }
+  { namespace, execution, signalName, payload }
 ) {
   const req = {
     namespace,
     workflowExecution: buildWorkflowExecutionRequest(execution),
-    signal,
+    signalName,
+    input: {
+      payloads: [
+        {
+          metadata: { encoding: Buffer.from("json/plain") },
+          data: Buffer.from(JSON.stringify(payload))
+        }
+      ]
+    },
   };
 
   const res = await this.client.signalWorkflowExecutionAsync(ctx, req);

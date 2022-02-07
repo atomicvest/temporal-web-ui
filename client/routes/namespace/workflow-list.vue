@@ -102,15 +102,13 @@ export default {
       statuses: [
         { value: 'ALL', label: 'All' },
         { value: 'OPEN', label: 'Open' },
+        { value: 'WAITING', label: 'Waiting' },
         { value: 'CLOSED', label: 'Closed' },
         { value: 'WORKFLOW_EXECUTION_STATUS_COMPLETED', label: 'Completed' },
         { value: 'WORKFLOW_EXECUTION_STATUS_FAILED', label: 'Failed' },
         { value: 'WORKFLOW_EXECUTION_STATUS_CANCELED', label: 'Cancelled' },
         { value: 'WORKFLOW_EXECUTION_STATUS_TERMINATED', label: 'Terminated' },
-        {
-          value: 'WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW',
-          label: 'Continued As New',
-        },
+        { value: 'WORKFLOW_EXECUTION_STATUS_CONTINUED_AS_NEW', label: 'Continued As New' },
         { value: 'WORKFLOW_EXECUTION_STATUS_TIMED_OUT', label: 'Timed Out' },
       ],
       maxRetentionDays: 30,
@@ -140,7 +138,7 @@ export default {
       return getEndTimeIsoString(range, endTime);
     },
     filterBy() {
-      return ['ALL', 'OPEN'].includes(this.status.value)
+      return ['ALL', 'OPEN', 'WAITING'].includes(this.status.value)
         ? 'StartTime'
         : 'CloseTime';
     },
@@ -154,6 +152,10 @@ export default {
 
       if (!this.statusName || statusName == 'ALL') {
         return 'all';
+      }
+
+      if (this.statusName == 'WAITING') {
+        return 'waiting'
       }
 
       return statusName === 'OPEN' ? 'open' : 'closed';
@@ -202,7 +204,7 @@ export default {
         return null;
       }
 
-      const includeStatus = !['ALL', 'OPEN', 'CLOSED'].includes(status);
+      const includeStatus = !['ALL', 'OPEN', 'CLOSED', 'WAITING'].includes(status);
 
       const criteria = {
         startTime,
@@ -224,7 +226,7 @@ export default {
         status: { value: status },
       } = this;
 
-      if (['OPEN', 'ALL'].includes(status)) {
+      if (['OPEN', 'ALL', 'WAITING'].includes(status)) {
         return null;
       }
 
@@ -280,6 +282,8 @@ export default {
         await this.fetchWorkflowsWithQuery();
       } else if (this.state === 'all') {
         await this.fetchWorkflowsAllStates();
+      } else if (this.state === 'waiting') {
+        await this.fetchWorkflowsWaiting();
       } else {
         await this.fetchWorkflowsByState();
       }
@@ -288,6 +292,19 @@ export default {
       const query = { ...this.criteria, nextPageToken: this.npt };
 
       query.queryString = decodeURI(query.queryString);
+
+      const { workflows, nextPageToken } = await this.fetch(
+        `/api/namespaces/${this.namespace}/workflows/list`,
+        query
+      );
+
+      this.results = [...this.results, ...workflows];
+      this.npt = nextPageToken;
+    },
+    async fetchWorkflowsWaiting() {
+      const query = { ...this.criteria, nextPageToken: this.npt };
+
+      query.queryString = 'ExecutionStatus = "Running" AND WaitingForSignal is not null AND WaitingForSignal != ""';
 
       const { workflows, nextPageToken } = await this.fetch(
         `/api/namespaces/${this.namespace}/workflows/list`,
@@ -506,6 +523,7 @@ export default {
             ? timestampToDate(data.closeTime).format('lll')
             : '',
           status: (data.status || 'open').toLowerCase(),
+          searchAttributes: data.searchAttributes,
         }));
 
         nextPageToken = res.nextPageToken;

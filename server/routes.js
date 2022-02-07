@@ -217,14 +217,15 @@ router.post(
 );
 
 router.post(
-  '/api/namespaces/:namespace/workflows/:workflowId/:runId/signal/:signal',
+  '/api/namespaces/:namespace/workflows/:workflowId/:runId/signal',
   async function(ctx) {
-    const { namespace, workflowId, runId, signal } = ctx.params;
+    const { namespace, workflowId, runId } = ctx.params;
 
     ctx.body = await tClient().signalWorkflow(ctx, {
       namespace,
       execution: { workflowId, runId },
-      signalName: signal,
+      signalName: ctx.request.body.signalName,
+      payload: ctx.request.body.payload,
     });
   }
 );
@@ -279,6 +280,7 @@ router.get(
           isArchived: true,
           startTime,
           type,
+          searchAttributes: null,
         },
         pendingActivities: null,
         pendingChildren: null,
