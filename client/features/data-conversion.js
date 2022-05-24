@@ -1,6 +1,66 @@
 import WebSocketAsPromised from 'websocket-as-promised';
 
-export const convertEventPayloads = async (events, port) => {
+export const convertEventPayloadsWithCodec = async (namespace, events, endpointTemplate, accessToken) => {
+  let headers = {
+    'Content-Type': 'application/json',
+    'X-Namespace': namespace,
+  };
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+  const requests = [];
+  const endpoint = endpointTemplate.replaceAll('{namespace}', namespace);
+
+  events.forEach(event => {
+    let payloadsPBs = [];
+
+    if (event.details.input) {
+      payloadsPBs.push(event.details.input);
+    }
+
+    if (event.details.result) {
+      payloadsPBs.push(event.details.result);
+    }
+
+    if (event.details.details) {
+      Object.values(event.details.details).forEach(field => {
+        payloadsPBs.push(field)
+      })
+    }
+
+    payloadsPBs.forEach(payloadsPB => {
+      requests.push(
+        fetch(`${endpoint}/decode`, { method: 'POST', headers: headers, body: JSON.stringify(payloadsPB) })
+          .then((response) => response.json())
+          .then((decodedPayloadsPB) => decodedPayloadsPB.payloads)
+          .then((decodedPayloads) => {
+            decodedPayloads.forEach((payload, i) => {
+              let data = window.atob(payload.data);
+              try {
+                decodedPayloads[i] = JSON.parse(data);
+              } catch {
+                decodedPayloads[i] = data;
+              }  
+            });
+  
+            payloadsPB.payloads = decodedPayloads
+          })
+          .catch(() => {
+            payloadsPB.payloads.forEach((payload) => {
+              payload.error = "Could not decode payload, remote decoder returned an error."
+            })
+          })
+      );
+    })
+  })
+
+  // We catch and handle errors above so no error handling needed here.
+  await Promise.all(requests);
+
+  return events;
+};
+
+export const convertEventPayloadsWithWebsocket = async (events, port) => {
   const sock = new WebSocketAsPromised(`ws://localhost:${port}/`, {
     packMessage: data => JSON.stringify(data),
     unpackMessage: data => JSON.parse(data),

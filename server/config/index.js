@@ -4,6 +4,8 @@ const yaml = require('js-yaml');
 const logger = require('../logger');
 
 const configPath = process.env.TEMPORAL_CONFIG_PATH || './server/config.yml';
+const codecEndpointFromEnv = process.env.TEMPORAL_CODEC_ENDPOINT;
+const codecPassAccessTokenFromEnv = process.env.TEMPORAL_CODEC_PASS_ACCESS_TOKEN ? ![false, 'false'].includes(process.env.TEMPORAL_CODEC_PASS_ACCESS_TOKEN) : undefined;
 
 const readConfigSync = () => {
   const cfgContents = readFileSync(configPath, {
@@ -26,6 +28,17 @@ const getAuthConfig = async () => {
   }
   return auth;
 };
+
+const getCodecConfig = async () => {
+  let { codec } = await readConfig();
+
+  const codecConfig = {
+    endpoint: codecEndpointFromEnv || codec?.endpoint,
+    passAccessToken: codecPassAccessTokenFromEnv || !!codec?.pass_access_token,
+  }
+
+  return codecConfig;
+}
 
 const getRoutingConfig = async () => {
   const { routing } = await readConfig();
@@ -71,6 +84,7 @@ logger.log(
 
 module.exports = {
   getAuthConfig,
+  getCodecConfig,
   getRoutingConfig,
   getTlsConfig,
 };
