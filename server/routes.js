@@ -232,7 +232,8 @@ router.post(
 
     ctx.body = await tClient().restartWorkflow(ctx, {
       namespace,
-      execution: { workflowId, runId },
+      // Empty runId means terminate the newest open workflow run, if any.
+      execution: { workflowId, runId: "" },
       firstEvent: events.history.events[0],
     });
   }
