@@ -217,6 +217,28 @@ router.post(
 );
 
 router.post(
+  '/api/namespaces/:namespace/workflows/:workflowId/:runId/restart',
+  async function(ctx) {
+    const { namespace, workflowId, runId } = ctx.params;
+
+    const events = await tClient().getHistory(ctx, {
+      namespace,
+      execution: { workflowId, runId },
+      nextPageToken: undefined,
+      waitForNewEvent: true,
+      rawPayloads: true,
+      maximumPageSize: 1,
+    });
+
+    ctx.body = await tClient().restartWorkflow(ctx, {
+      namespace,
+      execution: { workflowId, runId },
+      firstEvent: events.history.events[0],
+    });
+  }
+);
+
+router.post(
   '/api/namespaces/:namespace/workflows/:workflowId/:runId/signal',
   async function(ctx) {
     const { namespace, workflowId, runId } = ctx.params;

@@ -24,6 +24,18 @@
           Terminate
         </a>
       </feature-flag>
+
+      <feature-flag name="workflow-restart">
+        <a
+          href=""
+          class="restart"
+          v-show="showRestart"
+          @click.prevent="$modal.show('confirm-restart')"
+          data-cy="open-restart-dialog"
+        >
+          Restart
+        </a>
+      </feature-flag>
     </aside>
 
     <modal name="send-signal">
@@ -82,6 +94,28 @@
           href="#"
           class="cancel"
           @click.prevent="$modal.hide('confirm-termination')"
+        >
+          Cancel
+        </a>
+      </footer>
+    </modal>
+
+    <modal name="confirm-restart">
+      <h3>Are you sure you want to restart this workflow with the same parameters?</h3>
+      <p>This will terminate the existing open workflow run, if any.</p>
+      <footer>
+        <a
+          href="#"
+          class="restart"
+          @click.prevent="restart"
+          data-cy="confirm-restart"
+        >
+          Restart
+        </a>
+        <a
+          href="#"
+          class="cancel"
+          @click.prevent="$modal.hide('confirm-restart')"
         >
           Cancel
         </a>
@@ -205,7 +239,7 @@
 </template>
 
 <script>
-import { TERMINATE_DEFAULT_ERROR_MESSAGE, SIGNAL_DEFAULT_ERROR_MESSAGE } from './constants';
+import { TERMINATE_DEFAULT_ERROR_MESSAGE, SIGNAL_DEFAULT_ERROR_MESSAGE, RESTART_DEFAULT_ERROR_MESSAGE } from './constants';
 import { NOTIFICATION_TYPE_ERROR, NOTIFICATION_TYPE_SUCCESS } from '~constants';
 import { getErrorMessage } from '~helpers';
 import { BarLoader, DataViewer, DetailList, FeatureFlag } from '~components';
@@ -260,6 +294,9 @@ export default {
     showTerminate() {
       return this.isWorkflowRunning && this.webSettingsCache?.permitWriteApi;
     },
+    showRestart() {
+      return true // always show restart button (even for completed workflows)
+    },
     showSignal() {
       return this.isWorkflowRunning &&
         this.webSettingsCache?.permitWriteApi &&
@@ -313,6 +350,27 @@ export default {
           error => {
             this.$emit('onNotification', {
               message: getErrorMessage(error, TERMINATE_DEFAULT_ERROR_MESSAGE),
+              type: NOTIFICATION_TYPE_ERROR,
+            });
+          }
+        );
+    },
+    restart() {
+      this.$modal.hide('confirm-restart');
+      this.$http
+        .post(`${this.baseAPIURL}/restart`, {})
+        .then(
+          r => {
+            this.$emit('onNotification', {
+              message: 'Workflow restarted.',
+              type: NOTIFICATION_TYPE_SUCCESS,
+            });
+            // eslint-disable-next-line no-console
+            console.dir(r);
+          },
+          error => {
+            this.$emit('onNotification', {
+              message: getErrorMessage(error, RESTART_DEFAULT_ERROR_MESSAGE),
               type: NOTIFICATION_TYPE_ERROR,
             });
           }
@@ -383,9 +441,12 @@ section.workflow-summary
     flex-direction row
     a.terminate
       action-button(uber-orange)
+      margin-right 5px
     a.signal
       action-button(uber-blue)
       margin-right 5px
+    a.restart
+      action-button(uber-green)
 
 [data-modal="confirm-termination"]
   input
@@ -412,4 +473,17 @@ section.workflow-summary
     action-button(uber-green)
   a.cancel
     action-button()
+
+[data-modal="confirm-restart"]
+  p
+    margin layout-spacing-small 0
+    width 50vw
+  footer
+    display flex
+    justify-content space-between
+  a.restart
+    action-button(uber-orange)
+  a.cancel
+    action-button()
+
 </style>

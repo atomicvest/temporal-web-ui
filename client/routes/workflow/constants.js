@@ -6,3 +6,5 @@ export const SIGNAL_DEFAULT_ERROR_MESSAGE =
   'An error has occurred while trying to signal this workflow.'
 export const RESET_DEFAULT_ERROR_MESSAGE =
   'An error has occurred while trying to reset this workflow.'
+export const RESTART_DEFAULT_ERROR_MESSAGE =
+  'An error has occurred while trying to restart this workflow'

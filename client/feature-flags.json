@@ -10,5 +10,9 @@
   {
     "key": "workflow-signal",
     "value": true
+  },
+  {
+    "key": "workflow-restart",
+    "value": true
   }
 ]

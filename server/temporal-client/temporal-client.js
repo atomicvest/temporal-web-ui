@@ -252,6 +252,50 @@ TemporalClient.prototype.terminateWorkflow = async function(
   return uiTransform(res);
 };
 
+TemporalClient.prototype.restartWorkflow = async function(
+  ctx,
+  { namespace, execution, firstEvent }
+) {
+  if (!utils.isWriteApiPermitted()) {
+    throw Error('Restart method is disabled');
+  }
+
+  const terminateReq = {
+    namespace,
+    workflowExecution: buildWorkflowExecutionRequest(execution),
+    reason: "Workflow restart requested",
+  };
+
+  try {
+    await this.client.terminateWorkflowExecutionAsync(ctx, terminateReq);
+  }
+  catch (err) {
+    // Already completed workflows can't be terminated.
+  }
+
+  const createReq = {
+    namespace,
+    workflowId: execution.workflowId,
+    workflowType: firstEvent.details.workflowType,
+    taskQueue: firstEvent.details.taskQueue,
+    input: firstEvent.details.input,
+    workflowExecutionTimeout: firstEvent.details.workflowExecutionTimeout,
+    workflowRunTimeout: firstEvent.details.workflowRunTimeout,
+    workflowTaskTimeout: firstEvent.details.workflowTaskTimeout,
+    identity: firstEvent.details.identity,
+    requestId: uuidv4(),
+    retryPolicy: firstEvent.details.retryPolicy,
+    cronSchedule: firstEvent.details.cronSchedule,
+    memo: firstEvent.details.memo,
+    searchAttributes: firstEvent.details.searchAttributes,
+    header: firstEvent.details.header,
+  }
+
+  const createRes = await this.client.startWorkflowExecutionAsync(ctx, createReq);
+
+  return uiTransform(createRes);
+};
+
 TemporalClient.prototype.signalWorkflow = async function(
   ctx,
   { namespace, execution, signalName, payload }
