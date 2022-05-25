@@ -221,20 +221,50 @@ router.post(
   async function(ctx) {
     const { namespace, workflowId, runId } = ctx.params;
 
-    const events = await tClient().getHistory(ctx, {
+    // The following logic is modeled on tctl code.
+    // See https://github.com/temporalio/tctl/blob/b0d624495c90afedc045ac44282f12b6a670c5ad/cli/workflow_commands.go#L1341-L1378
+    eventId = 0
+
+    req = {
       namespace,
       execution: { workflowId, runId },
       nextPageToken: undefined,
-      waitForNewEvent: true,
-      rawPayloads: true,
-      maximumPageSize: 1,
-    });
+      waitForNewEvent: false,
+      rawPayloads: false,
+      maximumPageSize: 100,
+    };
 
-    ctx.body = await tClient().restartWorkflow(ctx, {
+inf:
+    while (true) {
+      events = await tClient().getHistory(ctx, req);
+      for (const e of events.history.events) {
+        if (e.eventType.startsWith('WorkflowTaskCompleted')) {
+          eventId = e.eventId;
+          break inf;
+        }
+        if (e.eventType.startsWith('WorkflowTaskScheduled')) {
+          if (eventId == 0) {
+            eventId = e.eventId + 1;
+          }
+        }
+      }
+      if (events.nextPageToken.length > 0) {
+        req.nextPageToken = events.nextPageToken;
+      } else {
+        break;
+      }
+    }
+
+    if (eventId == 0) {
+      throw "Unable to find any workflow completed or workflow scheduled task"
+    }
+
+    ctx.body = await tClient().resetWorkflow(ctx, {
       namespace,
-      // Empty runId means terminate the newest open workflow run, if any.
-      execution: { workflowId, runId: "" },
-      firstEvent: events.history.events[0],
+      execution: { workflowId, runId },
+      eventId,
+      reason: "restart",
+      reapplySignals: false,
     });
   }
 );
@@ -256,13 +286,14 @@ router.post(
 router.post(
   '/api/namespaces/:namespace/workflows/:workflowId/:runId/reset',
   async function(ctx) {
-    const { namespace, workflowId, runID } = ctx.params;
+    const { namespace, workflowId, runId } = ctx.params;
 
     ctx.body = await tClient().resetWorkflow(ctx, {
       namespace,
-      execution: { workflowId, runID },
-      eventID: ctx.request.body.eventID,
+      execution: { workflowId, runId },
+      eventId: ctx.request.body.eventId,
       reason: ctx.request.body.reason,
+      reapplySignals: ctx.request.body.reapplySignals,
     });
   }
 );

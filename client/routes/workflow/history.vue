@@ -59,8 +59,13 @@
 
     <modal name="reset-workflow">
       <h3>Are you sure you want to reset this workflow?</h3>
+      <div class="checkbox">
+        <p-check name="reapplySignals" color="primary" v-model="reapplySignals">
+          Reapply signals
+        </p-check>
+      </div>
       <input
-        v-model.number="resetEventID"
+        v-model.number="resetEventId"
         placeholder="Event ID"
         data-cy="reset-event-id"
       />
@@ -344,8 +349,9 @@ export default {
       splitSizeSet: [1, 99],
       splitSizeMinSet: [0, 0],
       unwatch: [],
-      resetEventID: undefined,
+      resetEventId: undefined,
       resetReason: undefined,
+      reapplySignals: false,
     };
   },
   props: [
@@ -576,8 +582,9 @@ export default {
       this.$modal.hide('reset-workflow');
       this.$http
         .post(`${this.baseAPIURL}/reset`, {
-          eventID: this.resetEventID,
+          eventId: this.resetEventId,
           reason: this.resetReason,
+          reapplySignals: this.reapplySignals,
         })
         .then(
           r => {
@@ -873,6 +880,8 @@ section.history
         top layout-spacing-small
 
 [data-modal="reset-workflow"]
+  div.checkbox
+    margin layout-spacing-small 0
   input
     margin layout-spacing-small 0
     width 50vw

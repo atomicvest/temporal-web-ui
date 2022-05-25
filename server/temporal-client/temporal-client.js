@@ -321,14 +321,15 @@ TemporalClient.prototype.signalWorkflow = async function(
 
 TemporalClient.prototype.resetWorkflow = async function(
   ctx,
-  { namespace, execution, eventID, reason }
+  { namespace, execution, eventId, reason, reapplySignals }
 ) {
   const req = {
     namespace,
     workflowExecution: buildWorkflowExecutionRequest(execution),
     reason,
-    workflowTaskFinishEventId: eventID,
+    workflowTaskFinishEventId: eventId,
     requestId: uuidv4(),
+    resetReapplyType: reapplySignals ? 1 : 2, // 1 = RESET_REAPPLY_TYPE_SIGNAL, 2 = RESET_REAPPLY_TYPE_NONE
   };
 
   const res = await this.client.resetWorkflowExecutionAsync(ctx, req);
