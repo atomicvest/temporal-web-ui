@@ -103,6 +103,11 @@
     <modal name="confirm-restart">
       <h3>Are you sure you want to restart this workflow with the same parameters?</h3>
       <p>This will terminate the existing open workflow run, if any.</p>
+      <div class="checkbox">
+        <p-check name="reapplySignals" color="primary" v-model="reapplySignals">
+          Reapply signals
+        </p-check>
+      </div>
       <footer>
         <a
           href="#"
@@ -252,6 +257,7 @@ export default {
       signalMetadata: undefined,
       terminationReason: undefined,
       webSettingsCache: undefined,
+      reapplySignals: false,
     };
   },
   props: [
@@ -358,7 +364,9 @@ export default {
     restart() {
       this.$modal.hide('confirm-restart');
       this.$http
-        .post(`${this.baseAPIURL}/restart`, {})
+        .post(`${this.baseAPIURL}/restart`, {
+          reapplySignals: reapplySignals,
+        })
         .then(
           r => {
             this.$emit('onNotification', {
@@ -475,6 +483,8 @@ section.workflow-summary
     action-button()
 
 [data-modal="confirm-restart"]
+  div.checkbox
+    margin layout-spacing-small 0
   p
     margin layout-spacing-small 0
     width 50vw

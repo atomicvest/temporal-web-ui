@@ -264,7 +264,7 @@ inf:
       execution: { workflowId, runId },
       eventId,
       reason: "restart",
-      reapplySignals: false,
+      reapplySignals: ctx.request.body && ctx.request.body.reapplySignals,
     });
   }
 );
