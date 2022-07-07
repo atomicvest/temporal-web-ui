@@ -365,7 +365,7 @@ export default {
       this.$modal.hide('confirm-restart');
       this.$http
         .post(`${this.baseAPIURL}/restart`, {
-          reapplySignals: reapplySignals,
+          reapplySignals: this.reapplySignals,
         })
         .then(
           r => {
