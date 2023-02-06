@@ -22,4 +22,5 @@ export const RANGE_OPTIONS = [
   { text: 'Last 7 days', value: 'last-7-days', daysAgo: 7 },
   { text: 'Last 30 days', value: 'last-30-days', daysAgo: 30 },
   { text: 'Last 3 months', value: 'last-3-months', daysAgo: 90 },
+  { text: 'Last 6 months', value: 'last-6-months', daysAgo: 180 },
 ];

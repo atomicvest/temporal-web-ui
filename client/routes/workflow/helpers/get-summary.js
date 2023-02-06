@@ -3,6 +3,7 @@ import parentWorkflowLink from './parent-workflow-link';
 import { getKeyValuePairs, timestampToDate } from '~helpers';
 
 const getSummary = ({ events, isWorkflowRunning, workflow }) => {
+  // For displaying pending activities.
   const formattedWorkflow = workflow.pendingActivities
     ? {
         ...workflow,
@@ -12,6 +13,22 @@ const getSummary = ({ events, isWorkflowRunning, workflow }) => {
         })),
       }
     : workflow;
+
+  // For displaying pending child workflows.
+  if (workflow.pendingChildren) {
+    formattedWorkflow.pendingChildren = formattedWorkflow.pendingChildren || {};
+    formattedWorkflow.pendingChildren.kvps = workflow.pendingChildren.map(pendingChild => ({
+      key: pendingChild.runId,
+      value: pendingChild.workflowId,
+      routeLink: {
+        name: 'workflow/summary',
+        params: {
+          workflowId: pendingChild.workflowId,
+          runId: pendingChild.runId,
+        },
+      },
+    }))
+  }
 
   if (formattedWorkflow.workflowExecutionInfo) {
     const { workflowExecutionInfo } = formattedWorkflow;

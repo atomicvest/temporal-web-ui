@@ -239,6 +239,14 @@
           <detail-list :item="pa" />
         </dd>
       </div>
+      <div
+        class="pending-child-workflows"
+        v-if="workflow.pendingChildren"
+        data-cy="pending-child-workflows"
+      >
+        <dt>Pending Child Workflows</dt>
+        <dd><detail-list :item="workflow.pendingChildren" /></dd>
+      </div>
     </dl>
   </section>
 </template>
@@ -406,7 +414,7 @@ section.workflow-summary
   overflow auto
   padding layout-spacing-small
 
-  .pending-activities {
+  .pending-activities, .pending-child-workflows {
     dl.details {
       dd {
         white-space: normal;

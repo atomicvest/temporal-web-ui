@@ -113,11 +113,12 @@ export default {
       ],
       maxRetentionDays: 30,
       filterMode: 'basic',
+      abortController: new AbortController(), // for aborting previous debounced fetch request.
     };
   },
   created() {
     this.fetchNamespace();
-    this.fetchWorkflows();
+    this.fetchWorkflows(this.abortController.signal);
   },
   mounted() {
     this.interval = setInterval(() => {
@@ -244,12 +245,17 @@ export default {
   methods: {
     refreshWorkflows: debounce(
       function refreshWorkflows() {
-        this.results = [];
-        this.npt = undefined;
-        this.nptAlt = undefined;
-        this.lastOpenWfTime = undefined;
-        this.lastClosedWfTime = undefined;
-        this.fetchWorkflows();
+        this.abortController.signal.onabort = () => {
+          this.abortController = new AbortController()
+          this.results = [];
+          this.npt = undefined;
+          this.nptAlt = undefined;
+          this.lastOpenWfTime = undefined;
+          this.lastClosedWfTime = undefined;
+          this.fetchWorkflows(this.abortController.signal);
+        }
+        // Abort any previous in-flight requests before making a new request.
+        this.abortController.abort();
       },
       typeof Mocha === 'undefined' ? 200 : 60,
       { maxWait: 1000 }
@@ -273,48 +279,52 @@ export default {
         }
       });
     },
-    async fetchWorkflows() {
-      if (!this.criteria || this.loading) {
+    async fetchWorkflows(abortSignal) {
+      if (!this.criteria) {
         return;
       }
 
       if (this.criteria.queryString) {
-        await this.fetchWorkflowsWithQuery();
+        await this.fetchWorkflowsWithQuery(abortSignal);
       } else if (this.state === 'all') {
-        await this.fetchWorkflowsAllStates();
+        await this.fetchWorkflowsAllStates(abortSignal);
       } else if (this.state === 'waiting') {
-        await this.fetchWorkflowsWaiting();
+        await this.fetchWorkflowsWaiting(abortSignal);
       } else {
-        await this.fetchWorkflowsByState();
+        await this.fetchWorkflowsByState(abortSignal);
       }
     },
-    async fetchWorkflowsWithQuery() {
+    async fetchWorkflowsWithQuery(abortSignal) {
       const query = { ...this.criteria, nextPageToken: this.npt };
 
       query.queryString = decodeURI(query.queryString);
 
       const { workflows, nextPageToken } = await this.fetch(
         `/api/namespaces/${this.namespace}/workflows/list`,
-        query
+        query, abortSignal,
       );
 
-      this.results = [...this.results, ...workflows];
-      this.npt = nextPageToken;
+      if (!abortSignal.aborted) {
+        this.results = [...this.results, ...workflows];
+        this.npt = nextPageToken;
+      }
     },
-    async fetchWorkflowsWaiting() {
+    async fetchWorkflowsWaiting(abortSignal) {
       const query = { ...this.criteria, nextPageToken: this.npt };
 
       query.queryString = 'ExecutionStatus = "Running" AND WaitingForSignal is not null AND WaitingForSignal != ""';
 
       const { workflows, nextPageToken } = await this.fetch(
         `/api/namespaces/${this.namespace}/workflows/list`,
-        query
+        query, abortSignal,
       );
 
-      this.results = [...this.results, ...workflows];
-      this.npt = nextPageToken;
+      if (!abortSignal.aborted) {
+        this.results = [...this.results, ...workflows];
+        this.npt = nextPageToken;
+      }
     },
-    async fetchWorkflowsByState() {
+    async fetchWorkflowsByState(abortSignal) {
       const { namespace, state } = this;
       const query = { ...this.criteria, nextPageToken: this.npt };
 
@@ -324,14 +334,16 @@ export default {
 
       const { workflows, nextPageToken } = await this.fetch(
         `/api/namespaces/${namespace}/workflows/${state}`,
-        query
+        query, abortSignal,
       );
 
-      this.results = [...this.results, ...workflows];
-      this.npt = nextPageToken;
+      if (!abortSignal.aborted) {
+        this.results = [...this.results, ...workflows];
+        this.npt = nextPageToken;
+      }
     },
-    async fetchWorkflowsAllStates() {
-      const { namespace, npt, nptAlt, lastOpenWfTime, lastClosedWfTime } = this;
+    async fetchWorkflowsAllStates(abortSignal) {
+      const { namespace, npt, nptAlt, lastOpenWfTime, lastClosedWfTime, criteria } = this;
 
       const fetchWorkflows = async type => {
         if (!['open', 'closed'].includes(type)) {
@@ -340,21 +352,23 @@ export default {
 
         const pageToken = type === 'open' ? npt : nptAlt;
 
-        const query = { ...this.criteria, nextPageToken: pageToken };
+        const query = { ...criteria, nextPageToken: pageToken };
         const { workflows, nextPageToken } = await this.fetch(
           `/api/namespaces/${namespace}/workflows/${type}`,
-          query
+          query, abortSignal,
         );
 
         const lastWf = minBy(workflows, w => moment(w.startTime));
         const lastWfTime = lastWf ? moment(lastWf.startTime) : undefined;
 
-        if (type === 'open') {
-          this.lastOpenWfTime = lastWfTime;
-          this.npt = nextPageToken;
-        } else {
-          this.lastClosedWfTime = lastWfTime;
-          this.nptAlt = nextPageToken;
+        if (!abortSignal.aborted) {
+          if (type === 'open') {
+            this.lastOpenWfTime = lastWfTime;
+            this.npt = nextPageToken;
+          } else {
+            this.lastClosedWfTime = lastWfTime;
+            this.nptAlt = nextPageToken;
+          }
         }
 
         return workflows;
@@ -370,13 +384,11 @@ export default {
         // fetch initial page of both open and closed workflows
         const wfsO = await fetchWorkflows('open');
         const wfsC = await fetchWorkflows('closed');
-
         workflows = [...wfsO, ...wfsC].sort(
           (a, b) => moment(b.startTime) - moment(a.startTime)
         );
       } else if (!npt && !nptAlt) {
         // nothing more to fetch
-
         return;
       } else if (npt && !nptAlt) {
         // only open workflows are left to fetch
@@ -392,7 +404,9 @@ export default {
         workflows = await fetchWorkflows('closed');
       }
 
-      this.results = [...this.results, ...workflows];
+      if (!abortSignal.aborted) {
+        this.results = [...this.results, ...workflows];
+      }
     },
     setWorkflowFilter(e) {
       const target = e.target || e.testTarget; // test hook since Event.target is readOnly and unsettable
@@ -500,9 +514,9 @@ export default {
         return;
       }
 
-      return this.fetchWorkflows();
+      return this.fetchWorkflows(this.abortController.signal);
     },
-    async fetch(url, query) {
+    async fetch(url, query, abortSignal) {
       this.loading = true;
       this.error = undefined;
 
@@ -510,7 +524,7 @@ export default {
       let nextPageToken;
 
       try {
-        const res = await this.$http(url, { query });
+        const res = await this.$http(url, { signal: abortSignal, query });
 
         workflows = res.executions.map(data => ({
           workflowId: data.execution.workflowId,
@@ -528,11 +542,13 @@ export default {
 
         nextPageToken = res.nextPageToken;
       } catch (e) {
-        this.error = (e.json && e.json.message) || e.status || e.message;
+        // It is only an error if the request was not aborted.
+        if (e.name !== "AbortError") {
+          this.error = (e.json && e.json.message) || e.status || e.message;
+        }
       }
 
       this.loading = false;
-
       return { workflows, nextPageToken };
     },
   },
