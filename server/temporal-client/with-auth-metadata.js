@@ -3,8 +3,11 @@ const { getAuthConfig } = require('../config');
 
 const WithAuthMetadata = (temporalClient) => {
   let tClient = Object.create(temporalClient);
+  let uniq_namespaces = [ ...new Set(process.env.TEMPORAL_NAMESPACES.split(',')) ];
 
-  tClient.client = new Proxy(tClient.client, { get: getter });
+  uniq_namespaces.forEach(n => {
+    tClient.client[n] = new Proxy(tClient.client[n], { get: getter });
+  });
 
   return tClient;
 };

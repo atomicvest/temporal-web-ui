@@ -132,7 +132,7 @@ function uiTransform(item, rawPayloads = false, transformingPayloads = false) {
             payloads = [...payloads, data];
           } catch (error) {
             logger.log(
-              `Unable to process payload. Encoding: ${encoding}, data: ${data}. ${error}`
+              `Unable to process payload. Encoding: ${encoding}. ${error}`
             );
             payloads = [...payloads, data.toString()];
           }

@@ -48,13 +48,19 @@ function TemporalClient(tlsConfig) {
   tlsOpts['grpc.max_receive_message_length'] =
     Number(process.env.TEMPORAL_GRPC_MAX_MESSAGE_LENGTH) || 4 * 1024 * 1024;
 
-  let client = new service.temporal.api.workflowservice.v1.WorkflowService(
-    process.env.TEMPORAL_GRPC_ENDPOINT || '127.0.0.1:7233',
-    tlsCreds,
-    tlsOpts
-  );
+  let client = {};
+  let uniq_namespaces = [ ...new Set(process.env.TEMPORAL_NAMESPACES.split(',')) ];
 
-  client = bluebird.promisifyAll(client);
+  // Create separate clients for each namespace (required for temporal cloud).
+  uniq_namespaces.forEach(n => {
+    client[n] = new service.temporal.api.workflowservice.v1.WorkflowService(
+      `${n}${process.env.TEMPORAL_CLOUD_SUFFIX}` || '127.0.0.1:7233',
+      tlsCreds,
+      tlsOpts
+    );
+    client[n] = bluebird.promisifyAll(client[n]);
+  })
+
   this.client = client;
 }
 
@@ -64,20 +70,25 @@ TemporalClient.prototype.describeNamespace = async function(
 ) {
   const req = { namespace };
 
-  const res = await this.client.describeNamespaceAsync(ctx, req);
+  const res = await this.client[namespace].describeNamespaceAsync(ctx, req);
 
   return uiTransform(res);
 };
 
+// For temporal cloud, return a fixed list of namespaces from the environment variable.
 TemporalClient.prototype.listNamespaces = async function(
   ctx,
   { pageSize, nextPageToken }
 ) {
-  const req = { pageSize, nextPageToken };
+  let resp = { namespaces: [] };
+  let uniq_namespaces = [ ...new Set(process.env.TEMPORAL_NAMESPACES.split(',')) ];
 
-  const res = await this.client.listNamespacesAsync(ctx, req);
+  uniq_namespaces.sort().forEach(n => {
+    let details = { namespaceInfo: {name: n} }
+    resp.namespaces.push(details)
+  })
 
-  return uiTransform(res);
+  return resp
 };
 
 TemporalClient.prototype.openWorkflows = async function(
@@ -104,7 +115,7 @@ TemporalClient.prototype.openWorkflows = async function(
     typeFilter,
     executionFilter,
   };
-  const res = await this.client.listOpenWorkflowExecutionsAsync(ctx, req);
+  const res = await this.client[namespace].listOpenWorkflowExecutionsAsync(ctx, req);
 
   return uiTransform(res);
 };
@@ -136,7 +147,7 @@ TemporalClient.prototype.closedWorkflows = async function(
     statusFilter: status ? { status } : undefined,
   };
 
-  const res = await this.client.listClosedWorkflowExecutionsAsync(ctx, req);
+  const res = await this.client[namespace].listClosedWorkflowExecutionsAsync(ctx, req);
 
   return uiTransform(res);
 };
@@ -153,7 +164,7 @@ TemporalClient.prototype.listWorkflows = async function(
     maximumPageSize,
   };
 
-  const res = await this.client.listWorkflowExecutionsAsync(ctx, req);
+  const res = await this.client[namespace].listWorkflowExecutionsAsync(ctx, req);
 
   return uiTransform(res);
 };
@@ -177,7 +188,7 @@ TemporalClient.prototype.getHistory = async function(
     maximumPageSize,
   };
 
-  let res = await this.client.getWorkflowExecutionHistoryAsync(ctx, req);
+  let res = await this.client[namespace].getWorkflowExecutionHistoryAsync(ctx, req);
 
   res = uiTransform(res, rawPayloads);
 
@@ -199,7 +210,7 @@ TemporalClient.prototype.archivedWorkflows = async function(
     pageSize,
   };
 
-  const res = await this.client.listArchivedWorkflowExecutionsAsync(ctx, req);
+  const res = await this.client[namespace].listArchivedWorkflowExecutionsAsync(ctx, req);
 
   return uiTransform(res);
 };
@@ -214,7 +225,7 @@ TemporalClient.prototype.exportHistory = async function(
     nextPageToken,
   };
 
-  const res = await this.client.getWorkflowExecutionHistoryAsync(ctx, req);
+  const res = await this.client[namespace].getWorkflowExecutionHistoryAsync(ctx, req);
 
   return cliTransform(res);
 };
@@ -228,7 +239,7 @@ TemporalClient.prototype.queryWorkflow = async function(
     execution: buildWorkflowExecutionRequest(execution),
     query,
   };
-  const res = await this.client.queryWorkflowAsync(ctx, req);
+  const res = await this.client[namespace].queryWorkflowAsync(ctx, req);
 
   return uiTransform(res);
 };
@@ -247,7 +258,7 @@ TemporalClient.prototype.terminateWorkflow = async function(
     reason,
   };
 
-  const res = await this.client.terminateWorkflowExecutionAsync(ctx, req);
+  const res = await this.client[namespace].terminateWorkflowExecutionAsync(ctx, req);
 
   return uiTransform(res);
 };
@@ -267,7 +278,7 @@ TemporalClient.prototype.restartWorkflow = async function(
   };
 
   try {
-    await this.client.terminateWorkflowExecutionAsync(ctx, terminateReq);
+    await this.client[namespace].terminateWorkflowExecutionAsync(ctx, terminateReq);
   }
   catch (err) {
     // Already completed workflows can't be terminated.
@@ -291,7 +302,7 @@ TemporalClient.prototype.restartWorkflow = async function(
     header: firstEvent.details.header,
   }
 
-  const createRes = await this.client.startWorkflowExecutionAsync(ctx, createReq);
+  const createRes = await this.client[namespace].startWorkflowExecutionAsync(ctx, createReq);
 
   return uiTransform(createRes);
 };
@@ -314,7 +325,7 @@ TemporalClient.prototype.signalWorkflow = async function(
     },
   };
 
-  const res = await this.client.signalWorkflowExecutionAsync(ctx, req);
+  const res = await this.client[namespace].signalWorkflowExecutionAsync(ctx, req);
 
   return uiTransform(res);
 };
@@ -332,7 +343,7 @@ TemporalClient.prototype.resetWorkflow = async function(
     resetReapplyType: reapplySignals ? 1 : 2, // 1 = RESET_REAPPLY_TYPE_SIGNAL, 2 = RESET_REAPPLY_TYPE_NONE
   };
 
-  const res = await this.client.resetWorkflowExecutionAsync(ctx, req);
+  const res = await this.client[namespace].resetWorkflowExecutionAsync(ctx, req);
 
   return uiTransform(res);
 };
@@ -346,7 +357,7 @@ TemporalClient.prototype.describeWorkflow = async function(
     execution: buildWorkflowExecutionRequest(execution),
   };
 
-  const res = await this.client.describeWorkflowExecutionAsync(ctx, req);
+  const res = await this.client[namespace].describeWorkflowExecutionAsync(ctx, req);
 
   return uiTransform(res);
 };
@@ -356,15 +367,15 @@ TemporalClient.prototype.describeTaskQueue = async function(
   { namespace, taskQueue, taskQueueType }
 ) {
   const req = { namespace, taskQueue, taskQueueType };
-  const res = await this.client.describeTaskQueueAsync(ctx, req);
+  const res = await this.client[namespace].describeTaskQueueAsync(ctx, req);
 
   return uiTransform(res);
 };
 
-TemporalClient.prototype.getVersionInfo = async function(ctx) {
-  const res = await this.client.getClusterInfoAsync(ctx, {});
-
-  return uiTransform(res.versionInfo);
-};
+// TemporalClient.prototype.getVersionInfo = async function(ctx) {
+//   const res = await this.client.getClusterInfoAsync(ctx, {});
+//
+//   return uiTransform(res.versionInfo);
+// };
 
 module.exports = { TemporalClient };
